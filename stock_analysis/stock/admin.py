@@ -7,7 +7,7 @@ class TickerAdmin(admin.ModelAdmin):
 
 
 class NewsAdmin(admin.ModelAdmin):
-    list_display = ['id', 'title', 'sentiment', 'date', 'time']
+    list_display = ['id', 'ticker', 'source', 'title', 'sentiment', 'date_time']
 
 
 class HistoryAdmin(admin.ModelAdmin):
