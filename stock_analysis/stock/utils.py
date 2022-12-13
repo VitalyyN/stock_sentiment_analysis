@@ -1,15 +1,9 @@
-import os
 import dotenv
 import requests
 import feedparser
 from datetime import datetime
-import asyncio
-from telethon.sync import TelegramClient
-from telethon import utils
-from telethon.tl.functions.messages import GetHistoryRequest
-from telethon.tl.types import PeerChannel
-from telethon.tl.functions.messages import GetDialogsRequest
-from telethon.tl.types import InputPeerEmpty
+from dateutil.parser import parse
+import emoji
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 
@@ -17,11 +11,11 @@ from selenium.webdriver.common.by import By
 dotenv.load_dotenv()
 
 
-def create_dict_for_db(title, source, date, time):
+def create_dict_for_db(title, source, datetime_news):
     news_item = {'title': title,
                  'source': source,
-                 'date': date,
-                 'time': time}
+                 'date_time': datetime_news
+                 }
     return news_item
 
 
@@ -30,87 +24,93 @@ def save_in_db(db_model, data_dict, ticker):
         db_model.objects.create(ticker=ticker,
                                 title=elem['title'],
                                 source=elem['source'],
-                                sentiment=1,
-                                date_time=datetime.strptime(f"{elem['date']} {elem['time']}", "%d.%m.%Y %H:%M:%S"))
+                                sentiment=1,  # Получить из анализа
+                                date_time=elem['date_time'])
 
 
-class NewsAggregator:
-    def __init__(self):
-        self.rss_link = 'https://rssexport.rbc.ru/rbcnews/news/20/full.rss'
-        self.tg_chanel = '@cbrstocks'
+def rss_parser(url, source, last_news):
+    res = requests.get(url)
+    feed = feedparser.parse(res.text)
+    news_all = list()
 
-        self.site = 'https://www.finam.ru/publications/section/companies/'
+    for entry in feed.entries:
+        title = None
 
-    def rss_parser(self, last_news):
-        res = requests.get(self.rss_link)
-        feed = feedparser.parse(res.text)
-        news_all = list()
-        source = 'rbc-news'
+        if source == 'rbc':
+            title = entry['description'].lower()
 
-        for entry in feed.entries:
-            title = entry['title']
+        if source == 'finam':
+            title = entry['title'].lower()
 
-            if last_news and title.startswith(last_news.title[:50]):
+        if last_news and title.startswith(last_news.title[:40]):
+            break
+
+        datetime_news = parse(entry.published)
+
+        if datetime.now().date() == datetime_news.date():
+            news_all.append(create_dict_for_db(title, source, datetime_news))
+
+    return news_all
+
+
+def tg_parser(url, source, last_news):
+    news_all = []
+    options = uc.ChromeOptions()
+    options.headless = True
+    options.add_argument('--headless')
+    driver = uc.Chrome(options=options)
+
+    try:
+        driver.get(url)
+        news_list_all = driver.find_elements(By.CLASS_NAME, 'post-container')
+
+        for elem in news_list_all:
+            title = elem.find_element(By.CLASS_NAME, 'post-body').text
+            title = ''.join(char for char in title if not emoji.is_emoji(char)).lower()
+
+            if last_news and title.startswith(last_news.title[:40]):
                 break
 
-            date = entry['rbc_news_date']
-            time = entry['rbc_news_time']
+            datetime_news = parse(elem.find_element(By.CLASS_NAME, 'post-header').
+                                  find_element(By.CLASS_NAME, 'text-muted').text)
 
-            if datetime.now().date().strftime("%d.%m.%Y") == date:
-                news_all.append(create_dict_for_db(title, source, date, time))
+            if datetime.now().date() == datetime_news.date():
+                news_all.append(create_dict_for_db(title, source, datetime_news))
 
         return news_all
 
-    def tg_parser(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    except Exception as ex:
+        print(ex)
+        return None
+    finally:
+        driver.close()
+        driver.quit()
 
-        client = TelegramClient('scrapy',
-                                int(os.getenv('TG_API_ID')),
-                                os.getenv('TG_API_HASH')).start()
-        chanel = client.get_entity(self.tg_chanel)
-        # history = client.get_messages(chanel)
-        history = client(GetHistoryRequest(
-            peer=utils.get_input_peer(chanel),
-            offset_id=0,
-            offset_date=None,
-            add_offset=0,
-            limit=20,
-            max_id=0,
-            min_id=0,
-            hash=0
-        ))
 
-        return history
+class NewsAggregator:
+    def __init__(self, rbc=True, finam=True, tg=True):
+        self.rss_link_rbc = 'https://rssexport.rbc.ru/rbcnews/news/20/full.rss'
+        self.rss_link_finam = 'https://www.finam.ru/analysis/conews/rsspoint/'
+        self.tg_chanel = 'https://tgstat.ru/channel/@cbrstocks'
 
-    def site_parser(self, last_news):
-        news_all = []
-        source = 'finam'
-        options = uc.ChromeOptions()
-        options.headless = True
-        options.add_argument('--headless')
-        driver = uc.Chrome(options=options)
+        self.source_finam = 'finam'
+        self.source_rbc = 'rbc'
+        self.source_tg = 'tg'
 
-        try:
-            driver.get(self.site)
-            news_list_sel = driver.find_element(By.ID,
-                                                'finfin-local-plugin-block-item-publication-list-filter-date-content')
-            news = news_list_sel.find_elements(By.CLASS_NAME, 'publication-list-item')
-            for elem in news:
-                if elem.text[6].isdigit():
-                    break
-                if last_news and elem.text.startswith(last_news.title[:50]):
-                    break
-                news_dict = create_dict_for_db(title=elem.text,
-                                               source=source,
-                                               date=datetime.now().date().strftime("%d.%m.%Y"),
-                                               time=f'{elem.text[:5]}:00')
-                news_all.append(news_dict)
-            return news_all
-        except Exception as ex:
-            print(ex)
-            return None
-        finally:
-            driver.close()
-            driver.quit()
+        self.rbc_available = rbc
+        self.finam_available = finam
+        self.tg_available = tg
 
+    def aggregate(self, last_news):
+        all_news = list()
+        if self.rbc_available:
+            news_rbc = rss_parser(self.rss_link_rbc, self.source_rbc, last_news[self.source_rbc])
+            all_news.extend(news_rbc)
+        if self.finam_available:
+            news_finam = rss_parser(self.rss_link_finam, self.source_finam, last_news[self.source_finam])
+            all_news.extend(news_finam[:20])
+        if self.tg_available:
+            news_tg = tg_parser(self.tg_chanel, self.source_tg, last_news[self.source_tg])
+            all_news.extend(news_tg)
+
+        return all_news
