@@ -7,28 +7,41 @@ import emoji
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 
-
 dotenv.load_dotenv()
 
 
-def create_dict_for_db(title, source, datetime_news):
-    news_item = {'title': title,
+def create_dict_for_db(title, source, datetime_news, ticker):
+    news_item = {'ticker': ticker,
+                 'title': title,
                  'source': source,
-                 'date_time': datetime_news
-                 }
+                 'date_time': datetime_news}
     return news_item
 
 
-def save_in_db(db_model, data_dict, ticker):
-    for elem in data_dict:
-        db_model.objects.create(ticker=ticker,
+def save_in_db(db_model, data_dict_list):
+    for elem in data_dict_list:
+        db_model.objects.create(ticker=elem['ticker'],
                                 title=elem['title'],
                                 source=elem['source'],
                                 sentiment=1,  # Получить из анализа
                                 date_time=elem['date_time'])
 
 
-def rss_parser(url, source, last_news):
+def check_news_by_key(key_list, text):
+    for key in key_list:
+        if text.find(key) != -1:
+            return True
+    return False
+
+
+def check_news(news_all, ticker_db, title, datetime_news, source):
+    for ticker_item in ticker_db:
+        if datetime.now().date() == datetime_news.date() \
+                and check_news_by_key(ticker_item.key_word.split(','), title):
+            news_all.append(create_dict_for_db(title, source, datetime_news, ticker_item))
+
+
+def rss_parser(url, source, last_news, ticker_db):
     res = requests.get(url)
     feed = feedparser.parse(res.text)
     news_all = list()
@@ -46,15 +59,13 @@ def rss_parser(url, source, last_news):
             break
 
         datetime_news = parse(entry.published)
-
-        if datetime.now().date() == datetime_news.date():
-            news_all.append(create_dict_for_db(title, source, datetime_news))
+        check_news(news_all, ticker_db, title, datetime_news, source)
 
     return news_all
 
 
-def tg_parser(url, source, last_news):
-    news_all = []
+def tg_parser(url, source, last_news, ticker_db):
+    news_all = list()
     options = uc.ChromeOptions()
     options.headless = True
     options.add_argument('--headless')
@@ -74,8 +85,7 @@ def tg_parser(url, source, last_news):
             datetime_news = parse(elem.find_element(By.CLASS_NAME, 'post-header').
                                   find_element(By.CLASS_NAME, 'text-muted').text)
 
-            if datetime.now().date() == datetime_news.date():
-                news_all.append(create_dict_for_db(title, source, datetime_news))
+            check_news(news_all, ticker_db, title, datetime_news, source)
 
         return news_all
 
@@ -101,16 +111,17 @@ class NewsAggregator:
         self.finam_available = finam
         self.tg_available = tg
 
-    def aggregate(self, last_news):
+    def aggregate(self, last_news, ticker_db):
         all_news = list()
         if self.rbc_available:
-            news_rbc = rss_parser(self.rss_link_rbc, self.source_rbc, last_news[self.source_rbc])
+            news_rbc = rss_parser(self.rss_link_rbc, self.source_rbc, last_news[self.source_rbc], ticker_db)
             all_news.extend(news_rbc)
         if self.finam_available:
-            news_finam = rss_parser(self.rss_link_finam, self.source_finam, last_news[self.source_finam])
-            all_news.extend(news_finam[:20])
+            news_finam = rss_parser(self.rss_link_finam, self.source_finam, last_news[self.source_finam],
+                                    ticker_db)
+            all_news.extend(news_finam)
         if self.tg_available:
-            news_tg = tg_parser(self.tg_chanel, self.source_tg, last_news[self.source_tg])
+            news_tg = tg_parser(self.tg_chanel, self.source_tg, last_news[self.source_tg], ticker_db)
             all_news.extend(news_tg)
 
         return all_news
