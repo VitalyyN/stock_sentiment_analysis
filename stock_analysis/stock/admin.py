@@ -7,7 +7,8 @@ class TickerAdmin(admin.ModelAdmin):
 
 
 class NewsAdmin(admin.ModelAdmin):
-    list_display = ['id', 'ticker', 'source', 'title', 'sentiment', 'date_time']
+    list_display = ['id', 'ticker', 'source', 'title', 'sentiment_label', 'sentiment_str',
+                    'sentiment_score', 'date_time']
 
 
 class HistoryAdmin(admin.ModelAdmin):

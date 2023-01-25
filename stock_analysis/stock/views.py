@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .utils import NewsAggregator, save_in_db
+from .utils import NewsAggregator, save_in_db, classifier, sentiment_analise
 from .models import News, Ticker
 from datetime import datetime
 
@@ -14,7 +14,7 @@ def main_view(request):
         last_news = dict()
         last_news['rbc'] = News.objects.filter(source=news_aggregator.source_rbc).first()
         last_news['finam'] = News.objects.filter(source=news_aggregator.source_finam).first()
-        last_news['tg'] = News.objects.filter(source='tg').first()
+        last_news['tg'] = News.objects.filter(source=news_aggregator.source_tg).first()
 
         data = news_aggregator.aggregate(last_news, tickers)
         save_in_db(News, data)

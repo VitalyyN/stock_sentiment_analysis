@@ -1,20 +1,39 @@
 import dotenv
+import re
 import requests
 import feedparser
 from datetime import datetime
 from dateutil.parser import parse
 import emoji
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
+from newspaper import Article
+from transformers import pipeline
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
 
 dotenv.load_dotenv()
 
+model = AutoModelForSequenceClassification.from_pretrained('stock/pt_save_pretrained')
+tokenizer = AutoTokenizer.from_pretrained('stock/tokenizer_save_pretrained')
+classifier = pipeline(task='sentiment-analysis', model=model, tokenizer=tokenizer)
 
-def create_dict_for_db(title, source, datetime_news, ticker):
+labels_dict = {0: 'neutral', 1: 'positive', 2: 'negative'}
+
+
+def sentiment_analise(clf, message):
+    result = clf([message])
+    sent_int = int(result[0]['label'][-1])
+    return sent_int, labels_dict[sent_int], round(result[0]['score'], 2)
+
+
+def create_dict_for_db(title, source, datetime_news, ticker, sentiment_int, sentiment_str, score):
     news_item = {'ticker': ticker,
                  'title': title,
                  'source': source,
-                 'date_time': datetime_news}
+                 'date_time': datetime_news,
+                 'sentiment_int': sentiment_int,
+                 'sentiment_str': sentiment_str,
+                 'score': score}
     return news_item
 
 
@@ -23,13 +42,15 @@ def save_in_db(db_model, data_dict_list):
         db_model.objects.create(ticker=elem['ticker'],
                                 title=elem['title'],
                                 source=elem['source'],
-                                sentiment=1,  # Получить из анализа
+                                sentiment_label=elem['sentiment_int'],
+                                sentiment_str=elem['sentiment_str'],
+                                sentiment_score=elem['score'],
                                 date_time=elem['date_time'])
 
 
 def check_news_by_key(key_list, text):
     for key in key_list:
-        if text.find(key) != -1:
+        if text.find(key.strip()) != -1:
             return True
     return False
 
@@ -38,7 +59,8 @@ def check_news(news_all, ticker_db, title, datetime_news, source):
     for ticker_item in ticker_db:
         if datetime.now().date() == datetime_news.date() \
                 and check_news_by_key(ticker_item.key_word.split(','), title):
-            news_all.append(create_dict_for_db(title, source, datetime_news, ticker_item))
+            sent_int, sent_str, score = sentiment_analise(classifier, title)
+            news_all.append(create_dict_for_db(title, source, datetime_news, ticker_item, sent_int, sent_str, score))
 
 
 def rss_parser(url, source, last_news, ticker_db):
@@ -50,10 +72,10 @@ def rss_parser(url, source, last_news, ticker_db):
         title = None
 
         if source == 'rbc':
-            title = entry['description'].lower()
+            title = re.sub("[^А-Яа-яA-Za-z%0-9.,]", " ", entry['description'].lower())
 
         if source == 'finam':
-            title = entry['title'].lower()
+            title = re.sub("[^А-Яа-яA-Za-z%0-9.,]", " ", entry['title'].lower())
 
         if last_news and title.startswith(last_news.title[:40]):
             break
@@ -66,35 +88,25 @@ def rss_parser(url, source, last_news, ticker_db):
 
 def tg_parser(url, source, last_news, ticker_db):
     news_all = list()
-    options = uc.ChromeOptions()
-    options.headless = True
-    options.add_argument('--headless')
-    driver = uc.Chrome(options=options)
+    article = Article(url)
+    article.download()
+    article.parse()
+    soup = BeautifulSoup(article.html, 'lxml')
+    news_list_all = soup.findAll(class_='post-container')
 
-    try:
-        driver.get(url)
-        news_list_all = driver.find_elements(By.CLASS_NAME, 'post-container')
+    for elem in news_list_all:
+        title = elem.find(class_='post-text').text
+        title = ''.join(char for char in title if not emoji.is_emoji(char)).lower()
+        title = re.sub("[^А-Яа-яA-Za-z%0-9.,]", " ", title)
 
-        for elem in news_list_all:
-            title = elem.find_element(By.CLASS_NAME, 'post-body').text
-            title = ''.join(char for char in title if not emoji.is_emoji(char)).lower()
+        if last_news and title.startswith(last_news.title[:40]):
+            break
 
-            if last_news and title.startswith(last_news.title[:40]):
-                break
+        datetime_news = parse(elem.find(class_='text-muted').text)
 
-            datetime_news = parse(elem.find_element(By.CLASS_NAME, 'post-header').
-                                  find_element(By.CLASS_NAME, 'text-muted').text)
+        check_news(news_all, ticker_db, title, datetime_news, source)
 
-            check_news(news_all, ticker_db, title, datetime_news, source)
-
-        return news_all
-
-    except Exception as ex:
-        print(ex)
-        return None
-    finally:
-        driver.close()
-        driver.quit()
+    return news_all
 
 
 class NewsAggregator:
