@@ -9,5 +9,15 @@
         <p>{{elem}}</p>
     {% endfor %}
 
+    {% for tic in tickers %}
+        <p>{{tic}}</p>
+    {% endfor %}
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form }}
+        <button>Ок</button>
+    </form>
+
 </body>
 </html>

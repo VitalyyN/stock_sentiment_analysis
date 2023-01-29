@@ -4,7 +4,6 @@ import requests
 import feedparser
 from datetime import datetime
 from dateutil.parser import parse
-import emoji
 from bs4 import BeautifulSoup
 from newspaper import Article
 from transformers import pipeline
@@ -18,6 +17,8 @@ tokenizer = AutoTokenizer.from_pretrained('stock/tokenizer_save_pretrained')
 classifier = pipeline(task='sentiment-analysis', model=model, tokenizer=tokenizer)
 
 labels_dict = {0: 'neutral', 1: 'positive', 2: 'negative'}
+
+view_ticker_list = ['sber', 'gazp']
 
 
 def sentiment_analise(clf, message):
@@ -45,7 +46,8 @@ def save_in_db(db_model, data_dict_list):
                                 sentiment_label=elem['sentiment_int'],
                                 sentiment_str=elem['sentiment_str'],
                                 sentiment_score=elem['score'],
-                                date_time=elem['date_time'])
+                                date_time=elem['date_time']
+                                )
 
 
 def check_news_by_key(key_list, text):
@@ -95,30 +97,32 @@ def tg_parser(url, source, last_news, ticker_db):
     news_list_all = soup.findAll(class_='post-container')
 
     for elem in news_list_all:
-        title = elem.find(class_='post-text').text
-        title = ''.join(char for char in title if not emoji.is_emoji(char)).lower()
-        title = re.sub("[^А-Яа-яA-Za-z%0-9.,]", " ", title)
+        try:
+            title = elem.find(class_='post-text').text
+            title = re.sub("[^А-Яа-яA-Za-z%0-9.,]", " ", title).lower()
 
-        if last_news and title.startswith(last_news.title[:40]):
-            break
+            if last_news and title.startswith(last_news.title[:40]):
+                break
 
-        datetime_news = parse(elem.find(class_='text-muted').text)
+            datetime_news = parse(elem.find(class_='text-muted').text)
 
-        check_news(news_all, ticker_db, title, datetime_news, source)
+            check_news(news_all, ticker_db, title, datetime_news, source)
+        except AttributeError:
+            continue
 
     return news_all
 
 
 class NewsAggregator:
+    rss_link_rbc = 'https://rssexport.rbc.ru/rbcnews/news/20/full.rss'
+    rss_link_finam = 'https://www.finam.ru/analysis/conews/rsspoint/'
+    tg_chanel = 'https://tgstat.ru/channel/@cbrstocks'
+
+    source_finam = 'finam'
+    source_rbc = 'rbc'
+    source_tg = 'tg'
+
     def __init__(self, rbc=True, finam=True, tg=True):
-        self.rss_link_rbc = 'https://rssexport.rbc.ru/rbcnews/news/20/full.rss'
-        self.rss_link_finam = 'https://www.finam.ru/analysis/conews/rsspoint/'
-        self.tg_chanel = 'https://tgstat.ru/channel/@cbrstocks'
-
-        self.source_finam = 'finam'
-        self.source_rbc = 'rbc'
-        self.source_tg = 'tg'
-
         self.rbc_available = rbc
         self.finam_available = finam
         self.tg_available = tg
