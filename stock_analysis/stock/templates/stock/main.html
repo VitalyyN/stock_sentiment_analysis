@@ -13,6 +13,10 @@
         <p>{{tic}}</p>
     {% endfor %}
 
+    {% for elem in sentiment %}
+        <p>{{elem}}</p>
+    {% endfor %}
+
     <form method="post">
         {% csrf_token %}
         {{ form }}

@@ -1,7 +1,7 @@
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django import forms
-from .utils import NewsAggregator, save_in_db
+from .utils import NewsAggregator, save_in_db, count_of_sentiment
 from .utils import view_ticker_list
 from .models import News, Ticker
 from .forms import TickerSelectForm
@@ -23,15 +23,21 @@ def main_view(request):
         data = news_aggregator.aggregate(last_news, tickers)
         save_in_db(News, data)
 
+        sentiment_list = count_of_sentiment(view_ticker_list, News)
+
         form = TickerSelectForm()
         tickers_choice = Ticker.objects.all().order_by('ticker')
         choices = [(elem.ticker, elem.ticker) for elem in tickers_choice]
         choice_field = forms.ChoiceField(choices=choices, label='Выбирете тикер:')
         form.fields['ticker'] = choice_field
 
-        return render(request, 'stock/main.html', {'text': data, 'tickers': tickers, 'form': form})
+        return render(request, 'stock/main.html', {'text': data, 'tickers': tickers, 'form': form,
+                                                   'sentiment': sentiment_list})
 
     else:
-        view_ticker_list.append(request.POST.get('ticker'))
+        ticker = request.POST.get('ticker')
+        if ticker not in view_ticker_list:
+            view_ticker_list.append(ticker)
+
         return HttpResponseRedirect('/')
 

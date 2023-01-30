@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from newspaper import Article
 from transformers import pipeline
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from django.db.models import Count, F
 
 
 dotenv.load_dotenv()
@@ -19,6 +20,17 @@ classifier = pipeline(task='sentiment-analysis', model=model, tokenizer=tokenize
 labels_dict = {0: 'neutral', 1: 'positive', 2: 'negative'}
 
 view_ticker_list = ['sber', 'gazp']
+
+
+def count_of_sentiment(ticker_list, db_model):
+    res_list = list()
+    for ticker in ticker_list:
+        query_set_filtered = db_model.objects.filter(ticker__ticker__exact=ticker)
+        count_positive = query_set_filtered.filter(sentiment_label=1).count()
+        count_negative = query_set_filtered.filter(sentiment_label=2).count()
+        res_list.append({ticker: {'positive': count_positive, 'negative': count_negative}})
+
+    return res_list
 
 
 def sentiment_analise(clf, message):
