@@ -1,27 +1,145 @@
 <!DOCTYPE html>
+
+{% load static %}
+
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>Главная</title>
 </head>
+
 <body>
-    {% for elem in text %}
-        <p>{{elem}}</p>
-    {% endfor %}
+    <div id="content">
+        {% for elem in sentiment %}
+            {% for key, value in elem.items %}
+                <div id="{{key}}" style="border-bottom: 1px solid grey;">
+                    <p id="ticker">{{key}}</p>
+                    <p id="positive_p">Positive: <span id="positive_sp">{{value.positive}}</span></p>
+                    <p id="negative_p">Negative: <span id="negative_sp">{{value.negative}}</span></p>
 
-    {% for tic in tickers %}
-        <p>{{tic}}</p>
-    {% endfor %}
+                    <button value={{key}} onclick="remove(this)"> - </button>
+                 </div>
+            {% endfor %}
 
-    {% for elem in sentiment %}
-        <p>{{elem}}</p>
-    {% endfor %}
+        {% endfor %}
+    </div>
 
-    <form method="post">
-        {% csrf_token %}
-        {{ form }}
-        <button>Ок</button>
-    </form>
+    <div id="div_form">
+        <form name="form">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button>Ок</button>
+        </form>
+    </div>
+
+<script type="text/javascript">
+  let isRunning = true;
+</script>
+
+<script type="text/javascript">
+    function updateData() {
+        if (isRunning) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '{% url 'update' %}');
+            xhr.onload = function() {
+              if (xhr.status === 200) {
+                const data = JSON.parse(xhr.responseText);
+
+                for(let i = 0; i < data['data'].length; i += 1){
+                    var ticker = Object.keys(data['data'][i])[0]
+                    var positive = data['data'][i][ticker]['positive']
+                    var negative = data['data'][i][ticker]['negative']
+
+                    const tickerElement = document.getElementById(ticker);
+
+                    const positiveElement = tickerElement.querySelector("#positive_sp");
+                    const negativeElement = tickerElement.querySelector("#negative_sp");
+
+                    positiveElement.textContent = positive;
+                    negativeElement.textContent = negative;
+                };
+              } else {
+                console.error('Ошибка запроса:', xhr.statusText);
+              };
+            };
+            xhr.onerror = function() {
+              console.error('Ошибка запроса:', xhr.statusText);
+            };
+            xhr.send();
+          } else {return;};
+        }
+
+  setInterval(updateData, 30000);
+</script>
+
+<script type="text/javascript">
+    var div_form = document.querySelector('#div_form');
+
+    document.forms.form.onsubmit = function(e) {
+        isRunning = false;
+        e.preventDefault();
+
+        csrf = document.getElementsByName('csrfmiddlewaretoken')[0].value;
+
+        var user_select = document.forms.form.{{form.ticker.name}}.value;
+
+        user_select = encodeURIComponent(user_select);
+
+        var xhr = new XMLHttpRequest();
+
+        xhr.open('POST', '{% url 'main' %}');
+
+        xhr.onreadystatechange = function(){
+            if (xhr.readyState === 4 && xhr.status === 200){
+                var resp = JSON.parse(xhr.responseText);
+                if (resp["status"] === 1) {
+                    var added_div = document.createElement('div');
+
+                    added_div.innerHTML = '<p id="ticker">' + resp["ticker"] + '</p><p id="positive_p">Positive: <span id="positive_sp">' + resp["positive"] + '{{value.positive}}</span></p><p id="negative_p">Negative: <span id="negative_sp">' +resp["negative"] + '{{value.negative}}</span></p><button onclick="remove(this)"> - </button>';
+                    added_div.style = 'border-bottom: 1px solid grey;';
+                    added_div.id = resp["ticker"]
+                    added_div.lastChild.value = resp["ticker"]
+
+                    var div = document.getElementById('content');
+
+                    div.append(added_div);
+                } else {alert("Акция уже есть в списке отслеживания")};
+            };
+        };
+
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('X-Csrftoken', csrf);
+        xhr.setRequestHeader('HTTP_X_REQUESTED_WITH', 'XMLHttpRequest');
+
+        xhr.send('ticker=' + user_select);
+        isRunning = true;
+    };
+</script>
+
+<script type="text/javascript">
+    function remove(elem){
+
+        csrf = document.getElementsByName('csrfmiddlewaretoken')[0].value;
+        var xhr = new XMLHttpRequest();
+
+        var key = elem.value
+        key = encodeURIComponent(key);
+
+        xhr.open('POST', '{% url 'remove' %}');
+
+        xhr.onreadystatechange = function(){
+            if(xhr.readyState === 4 && xhr.status === 200) {
+                elem.parentNode.remove();
+            };
+        };
+
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('X-Csrftoken', csrf);
+        xhr.setRequestHeader('HTTP_X_REQUESTED_WITH', 'XMLHttpRequest');
+
+        xhr.send('ticker=' + key);
+    };
+</script>
 
 </body>
 </html>
