@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Ticker, History, News
+from .models import Ticker, History, News, Profile
+
+
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'watch_list']
 
 
 class TickerAdmin(admin.ModelAdmin):
@@ -15,6 +19,7 @@ class HistoryAdmin(admin.ModelAdmin):
     list_display = ['id', 'positive_news', 'negative_news', 'date_history']
 
 
+admin.site.register(Profile, ProfileAdmin)
 admin.site.register(Ticker, TickerAdmin)
 admin.site.register(History, HistoryAdmin)
 admin.site.register(News, NewsAdmin)

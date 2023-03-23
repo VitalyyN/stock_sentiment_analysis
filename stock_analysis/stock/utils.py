@@ -6,6 +6,7 @@ from datetime import datetime
 from dateutil.parser import parse
 from bs4 import BeautifulSoup
 from newspaper import Article
+from newspaper.article import ArticleException
 from transformers import pipeline
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
@@ -16,9 +17,8 @@ model = AutoModelForSequenceClassification.from_pretrained('stock/pt_save_pretra
 tokenizer = AutoTokenizer.from_pretrained('stock/tokenizer_save_pretrained')
 classifier = pipeline(task='sentiment-analysis', model=model, tokenizer=tokenizer)
 
-labels_dict = {0: 'neutral', 1: 'positive', 2: 'negative'}
 
-view_ticker_list = ['sber', 'gazp']
+labels_dict = {0: 'neutral', 1: 'positive', 2: 'negative'}
 
 
 def get_request(tickers, news_obj, news_aggr, tickers_list):
@@ -115,8 +115,17 @@ def rss_parser(url, source, last_news, ticker_db):
 def tg_parser(url, source, last_news, ticker_db):
     news_all = list()
     article = Article(url)
-    article.download()
-    article.parse()
+
+    try:
+        article.download()
+        article.parse()
+    except ArticleException as ae:
+        print(ae)
+        return news_all
+    except Exception as e:
+        print(e)
+        return news_all
+
     soup = BeautifulSoup(article.html, 'lxml')
     news_list_all = soup.findAll(class_='post-container')
 

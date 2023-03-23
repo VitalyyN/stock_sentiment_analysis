@@ -1,6 +1,10 @@
 from django import forms
-from .models import Ticker
 
 
 class TickerSelectForm(forms.Form):
     ticker = forms.ChoiceField()
+
+
+class LoginForm(forms.Form):
+    username = forms.CharField()
+    password = forms.CharField(widget=forms.PasswordInput)
