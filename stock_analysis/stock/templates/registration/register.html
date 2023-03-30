@@ -1,16 +1,38 @@
 <!DOCTYPE html>
+
+{% load static %}
+
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/normalize.css' %}">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
     <title>Регистрация</title>
 </head>
 <body>
-    <h2>Регистрация</h2>
-    <p>Зарегистрируйтесь или <a href="/login">Войдите</a></p>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Регистрация</button>
-    </form>
+    <header class="header__login">
+        <h3 class="login_title">Регистрация</h3>
+        <p>Зарегистрируйтесь или <a href="/login" class="register_link">Войдите</a></p>
+    </header>
+
+    <main>
+      <section class="section section__login">
+        <div id="content" class="content content__login flex">
+          <form method="post" class="form_login">
+            <div>
+              {% csrf_token %}
+              <p class="form_login__user_title">Имя ползователя:</p>
+              <p class="form_login__username">{{ form.username }}</p>
+              <p class="form_login__password_title">Пароль:</p>
+              <p class="form_login__password">{{ form.password1 }}</p>
+              <p class="form_login__password_title">Повоторите пароль:</p>
+              <p class="form_login__password">{{ form.password2 }}</p>
+            </div>
+            <button type="submit" class="button button_add">Регистрация</button>
+          </form>
+        </div>
+      </section>
+    </main>
 </body>
 </html>

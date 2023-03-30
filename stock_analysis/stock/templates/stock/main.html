@@ -14,47 +14,99 @@
 </head>
 
 <body>
-    <header>
-        <h3 class="greet"> Добро пожаловать <strong>{{user.username}}</strong></h3>
-        <a href="/logout" class="button btn_quit">Выйти</a>
-    </header>
+  <div class="spinner d-flex justify-content-center" id="spinner1">
+    <div class="spinner-border" role="status"></div>
+    <span class="visually-hidden">Loading...</span>
+  </div>
 
-    <main>
-      <section class="section">
-        <div id="content" class="content">
-          {% for elem in sentiment %}
-              {% for key, value in elem.items %}
-                  <div id="{{key}}" class="flex element">
-                      <div class="ticker_info flex">
-                        <p id="ticker" class="ticker">{{key}}</p>
-                        <div>
-                          <p id="positive_p"> <span class="sent">positive:</span> <span class="ticker_value" id="positive_sp">
-                            {{value.positive}}</span></p>
-                          <p id="negative_p"> <span class="sent">negative:</span> <span class="ticker_value" id="negative_sp">
-                            {{value.negative}}</span></p>
-                        </div>
+  <header>
+      <h3 class="greet"> Добро пожаловать <strong>{{user.username}}</strong></h3>
+      <a href="/logout" class="button btn_quit">Выйти</a>
+  </header>
+
+  <main>
+    <section class="section">
+      <div id="content" class="content">
+        {% for elem in sentiment %}
+            {% for key, value in elem.items %}
+                <div id="{{key}}" class="flex element">
+                    <div class="ticker_info flex">
+                      <p id="ticker" class="ticker">{{key}}</p>
+                      <div>
+                        <p id="positive_p"> <span class="sent">positive:</span> <span class="ticker_value" id="positive_sp">
+                          {{value.positive}}</span></p>
+                        <p id="negative_p"> <span class="sent">negative:</span> <span class="ticker_value" id="negative_sp">
+                          {{value.negative}}</span></p>
                       </div>
+                    </div>
 
-                      <button class="button button_remove" value={{key}} onclick="remove(this)">
-                        <hr class="button_remove__minus"></hr>
-                      </button>
-                  </div>
-              {% endfor %}
-          {% endfor %}
-        </div>
+                    <div class="chart-container">
+                      <div class="chart-bar chart-bar_positive" data-value={{value.positive}}></div>
+                      <div class="chart-bar chart-bar_negative" data-value={{value.negative}}></div>
+                    </div>                    
 
-        <div id="div_form" class="div_form">
-          <form name="form" class="form">
-            <label class="form_label">Выберите тикер:</label>
-            {% csrf_token %}
-            <p class="form_field">{{ form.ticker}}</p>
-            <button class="button button_add">Добавить</button>
-          </form>
-        </div>
-      </section>
-    </main>
+                    <button class="button button_remove" value={{key}} onclick="remove(this)">
+                      <hr class="button_remove__minus"></hr>
+                    </button>
+                </div>
+            {% endfor %}
+        {% endfor %}
+      </div>
+
+      <div id="div_form" class="div_form">
+        <form name="form" class="form">
+          <label class="form_label">Выберите тикер:</label>
+          {% csrf_token %}
+          <p class="form_field">{{ form.ticker}}</p>
+          <button class="button button_add">Добавить</button>
+        </form>
+      </div>
+    </section>
+  </main>
 </body>
 
+
+<script type="text/javascript">
+  function histogram() {
+    const histograms = document.querySelectorAll('.chart-container');
+
+    histograms.forEach((elem) => {
+      const pos_elem = elem.querySelector('.chart-bar_positive');
+      const pos_value = pos_elem.getAttribute('data-value');
+
+      const neg_elem = elem.querySelector('.chart-bar_negative');
+      const neg_value = neg_elem.getAttribute('data-value');
+
+      let width_pos = 0;
+      let width_neg = 0;
+
+      if (neg_value != 0 || pos_value != 0) {
+        width_pos = (Number.parseInt(pos_value) / (Number.parseInt(neg_value) + Number.parseInt(pos_value))) * 100;
+        width_neg = (Number.parseInt(neg_value) / (Number.parseInt(neg_value) + Number.parseInt(pos_value))) * 100;
+      };
+
+      pos_elem.style.width = `${width_pos}%`;
+      neg_elem.style.width = `${width_neg}%`;
+    });
+  };
+</script>
+
+<script type="text/javascript">
+  const spinner = document.getElementById('spinner1');
+
+  var xhr = new XMLHttpRequest();
+
+  xhr.open('GET', '{% url 'main' %}');
+
+  xhr.onreadystatechange = function(){
+      if (xhr.readyState === 4 && xhr.status === 200){          
+          spinner.classList.add('no-display');
+      };
+    };
+
+  xhr.send();
+  histogram();
+</script>
 
 <script type="text/javascript">
   let isRunning = true;
@@ -82,6 +134,14 @@
 
                     positiveElement.textContent = positive;
                     negativeElement.textContent = negative;
+
+                    const bar_pos = tickerElement.querySelector('.chart-bar_positive')
+                    const bar_neg = tickerElement.querySelector('.chart-bar_negative')
+
+                    bar_pos.setAttribute('data-value', positive)
+                    bar_neg.setAttribute('data-value', negative)
+
+                    histogram();
                 };
               } else {
                 console.error('Ошибка запроса:', xhr.statusText);
@@ -104,6 +164,16 @@
         isRunning = false;
         e.preventDefault();
 
+        var div = document.getElementById('content');
+        var spinner = document.createElement('div');
+        spinner.innerHTML = '<div class="spinner-border" role="status"></div><span class="visually-hidden">Loading...</span>'
+        spinner.classList.add('spinner2')
+        spinner.classList.add('element')
+        spinner.classList.add('d-flex')
+        spinner.classList.add('justify-content-center')
+        spinner.id = 'spinner2'
+        div.append(spinner)
+
         csrf = document.getElementsByName('csrfmiddlewaretoken')[0].value;
 
         var user_select = document.forms.form.{{form.ticker.name}}.value;
@@ -118,25 +188,33 @@
             if (xhr.readyState === 4 && xhr.status === 200){
                 var resp = JSON.parse(xhr.responseText);
                 if (resp["status"] === 1) {
-                    var added_div = document.createElement('div');
 
-                    added_div.insertAdjacentHTML("afterBegin", '<div class="ticker_info flex"><p id="ticker" class="ticker">' + resp["ticker"] + 
-                      '</p><div><p id="positive_p"> <span class="sent">positive:</span> <span class="ticker_value" id="positive_sp">' 
-                      + resp["positive"] + 
-                      '{{value.positive}}</span></p><p id="negative_p"> <span class="sent">negative:</span> <span class="ticker_value" id="negative_sp">' 
-                      +resp["negative"] + 
-                      '{{value.negative}}</span></p></div></div><button class="button button_remove" onclick="remove(this)" value={{key}} ><hr class="button_remove__minus"></hr></button>');
-                    
+                  var div = document.getElementById('content');
+                  var added_div = document.createElement('div');
+
+                  added_div.insertAdjacentHTML("afterBegin", '<div class="ticker_info flex"><p id="ticker" class="ticker">' + resp["ticker"] + 
+                    '</p><div><p id="positive_p"> <span class="sent">positive:</span> <span class="ticker_value" id="positive_sp">' 
+                    + resp["positive"] + 
+                    '{{value.positive}}</span></p><p id="negative_p"> <span class="sent">negative:</span> <span class="ticker_value" id="negative_sp">' 
+                    +resp["negative"] + 
+                    '{{value.negative}}</span></p></div></div> <div class="chart-container"><div class="chart-bar chart-bar_positive" data-value=' + resp["positive"] + 
+                      '></div><div class="chart-bar chart-bar_negative" data-value=' + resp["negative"] + 
+                      '></div></div>  <button class="button button_remove" onclick="remove(this)" value={{key}} ><hr class="button_remove__minus"></hr></button>');
                     added_div.className = "flex element"
-                    added_div.id = resp["ticker"]
-                    added_div.lastChild.value = resp["ticker"]
+                  added_div.id = resp["ticker"]
+                  added_div.lastChild.value = resp["ticker"]
 
-                    var div = document.getElementById('content');
+                  spinner.remove();
 
-                    div.append(added_div);
-                } else {alert("Акция уже есть в списке отслеживания")};
-            };
-        };
+                  div.append(added_div);
+                  histogram();
+
+                } else {
+                  alert("Акция уже есть в списке отслеживания");
+                  spinner.remove();
+                };
+              };
+          };
 
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         xhr.setRequestHeader('X-Csrftoken', csrf);
@@ -144,7 +222,7 @@
 
         xhr.send('ticker=' + user_select);
         isRunning = true;
-    };
+  };
 </script>
 
 <script type="text/javascript">

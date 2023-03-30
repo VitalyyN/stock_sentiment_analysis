@@ -1,3 +1,5 @@
+/*glob*/
+
 body {
   min-width: 320px;
   font-family: 'ProximaSoft', 'Rubik-Medium', sans-serif;
@@ -15,6 +17,11 @@ a {
   color: inherit;
   text-decoration: none;
   cursor: pointer;
+}
+
+a:focus {
+  outline: none;
+  border-bottom: 1px solid #000;
 }
 
 img,
@@ -70,6 +77,34 @@ header {
   padding: 0 20px;
 }
 
+.no-display {
+  display: none!important;
+}
+
+/*spinner*/
+
+.spinner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding-top: 200px;
+  background-color: #E2E2E2;
+  z-index: 9999;
+}
+
+.spinner2 {
+  padding: 18px;
+}
+
+.visually-hidden {
+  padding-left: 15px;
+  padding-top: 5px;
+}
+
+/*main*/
+
 .greet {
   margin-bottom: 20px;
   font-weight: 500;
@@ -83,6 +118,8 @@ header {
 }
 
 .element {
+  flex-direction: row;
+  justify-content: space-between;
   margin-bottom: 7px;
   background-color: rgb(175, 175, 204);
   border: 1px solid grey;
@@ -94,10 +131,8 @@ header {
 
 .button_remove {
   position: relative;
-  margin-left: auto;
   width: 15%;
 }
-
 
 .button_remove__minus {
   position: absolute;
@@ -124,16 +159,16 @@ header {
   color: #FFFFFF;
 }
 
-.ticker_info {
-  padding: 10px;
-}
-
 .ticker {
   margin-right: 15px;
   width: 45px;
   line-height:45px;
   font-weight: 600;
   font-size: larger;
+}
+
+.ticker_info {
+  padding: 10px;
 }
 
 .sent {
@@ -145,6 +180,28 @@ header {
   display: inline-block;
   padding-left: 5px;
   font-weight: 600;
+}
+
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.chart-bar {
+  flex: 1;
+  margin: 2px;
+  transition: height 0.5s, width 0.5s;
+}
+
+.chart-bar_positive {
+  background: linear-gradient(rgb(7, 82, 7), rgb(74, 141, 74));
+}
+
+.chart-bar_negative {
+  background: linear-gradient(rgb(116, 21, 21), rgb(202, 121, 121));
 }
 
 .div_form {
@@ -182,6 +239,63 @@ header {
   border: 1px solid rgb(68, 68, 68);
 }
 
+
+/*login*/
+
+.header__login {
+  padding-bottom: 20px;
+}
+
+.section__login {
+  max-width: 500px;
+}
+
+.content__login {
+  flex-direction: column;
+}
+
+.login_title {
+  font-weight: 500;
+}
+
+.register_link {
+  color: rgb(122, 122, 241);
+  transition: border-bottom 0.2s ease;
+}
+
+.register_link:hover {
+  outline: none;
+  border-bottom: 1px solid rgb(122, 122, 241);
+}
+
+.register_link:focus {
+  outline: none;
+  border-bottom: 1px solid rgb(122, 122, 241);
+}
+
+.form_login {
+  align-self: center;
+}
+
+.form_login__username {
+  margin-bottom: 20px;
+}
+
+.form_login__password {
+  margin-bottom: 20px;
+}
+
+.form_login__user_title {
+  font-weight: 600;
+}
+
+.form_login__password_title {
+  font-weight: 600;
+}
+
+
+/*media*/
+
 @media(max-width: 660px) {
   .button_remove {
     padding-left: 20px;
@@ -195,3 +309,4 @@ header {
     padding-right: 10px;
   }
 }
+
