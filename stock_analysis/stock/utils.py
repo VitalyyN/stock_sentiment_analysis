@@ -1,22 +1,33 @@
 from typing import List, Dict
-import dotenv
 import re
 import requests
 from datetime import datetime
 
+from django.db.models import Count, QuerySet
+
 import feedparser
 import transformers
+from loguru import logger
 from dateutil.parser import parse
 from bs4 import BeautifulSoup
-from django.db.models import Count, QuerySet, Model
 from newspaper import Article
 from newspaper.article import ArticleException
+from requests import RequestException
 from transformers import pipeline
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from .models import News
 
-dotenv.load_dotenv()
+
+logger.add(
+    'logs/log.log',
+    rotation='6h',
+    compression='zip',
+    level='INFO',
+    format='{time} - {level} - {message}',
+    backtrace=True,
+    diagnose=True,
+)
 
 model = AutoModelForSequenceClassification.from_pretrained('stock/pt_save_pretrained')
 tokenizer = AutoTokenizer.from_pretrained('stock/tokenizer_save_pretrained')
@@ -90,12 +101,14 @@ def count_of_sentiment(ticker_list: List[str], db_model: News):
     return res_list
 
 
+@logger.catch
 def sentiment_analise(clf: transformers.pipelines, message: str):
     result = clf([message])
     sent_int = int(result[0]['label'][-1])
     return sent_int, labels_dict[sent_int], round(result[0]['score'], 2)
 
 
+@logger.catch
 def create_dict_for_db(title: str,
                        source: str,
                        datetime_news: datetime,
@@ -114,6 +127,7 @@ def create_dict_for_db(title: str,
     return news_item
 
 
+@logger.catch
 def save_in_db(db_model: News, data_dict_list: List):
     list_db_obj = []
     for elem in data_dict_list:
@@ -137,6 +151,7 @@ def check_news_by_key(key_list: List[str], text: str):
     return False
 
 
+@logger.catch
 def check_news(news_all: List, ticker_db: QuerySet, title: str, datetime_news: datetime, source: str):
     for ticker_item in ticker_db:
         if datetime.now().date() == datetime_news.date() \
@@ -146,8 +161,14 @@ def check_news(news_all: List, ticker_db: QuerySet, title: str, datetime_news: d
 
 
 def rss_parser(url: str, source: str, last_news: News, ticker_db: QuerySet):
-    res = requests.get(url)
+    try:
+        res = requests.get(url)
+    except RequestException:
+        logger.exception(f'Error by request {source}-sourse')
+        return []
+
     feed = feedparser.parse(res.text)
+
     news_all = list()
 
     for entry in feed.entries:
@@ -176,10 +197,10 @@ def tg_parser(url: str, source: str, last_news: News, ticker_db: QuerySet):
         article.download()
         article.parse()
     except ArticleException as ae:
-        print(ae)
+        logger.exception('Error while request tg-sourse')
         return news_all
     except Exception as e:
-        print(e)
+        logger.exception(e)
         return news_all
 
     soup = BeautifulSoup(article.html, 'lxml')
@@ -197,6 +218,7 @@ def tg_parser(url: str, source: str, last_news: News, ticker_db: QuerySet):
 
             check_news(news_all, ticker_db, title, datetime_news, source)
         except AttributeError:
+            logger.exception('Error while parse by BS tg-page')
             continue
 
     return news_all
