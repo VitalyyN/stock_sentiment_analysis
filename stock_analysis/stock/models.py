@@ -42,18 +42,3 @@ class News(models.Model):
 
     def __str__(self):
         return f'{self.ticker.ticker} - {self.title[:50]} - {self.sentiment_str}'
-
-
-class History(models.Model):
-    ticker = models.ForeignKey(Ticker, verbose_name='Тикер', on_delete=models.CASCADE)
-    positive_news = models.IntegerField(verbose_name='позитивные новости')
-    negative_news = models.IntegerField(verbose_name='негативные новости')
-    date_history = models.DateField(verbose_name='дата новости', null=True)
-
-    class Meta:
-        verbose_name = 'История'
-        verbose_name_plural = 'Истоия'
-        ordering = ['-date_history']
-
-    def __str__(self):
-        return f'{self.ticker} - pos: {str(self.positive_news)} - neg: {str(self.negative_news)} - {self.date_history}'

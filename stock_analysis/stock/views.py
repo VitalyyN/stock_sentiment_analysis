@@ -1,13 +1,15 @@
+from datetime import datetime
+
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect
 from django import forms
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import authenticate, login
+
 from .utils import NewsAggregator, get_request
 from .models import News, Ticker, Profile
 from .forms import TickerSelectForm, LoginForm
-from datetime import datetime
 
 
 class UserLogin(LoginView):
@@ -47,7 +49,7 @@ def main_view(request):
         view_ticker_list = request.user.profile.watch_list.split(', ')
         tickers = Ticker.objects.filter(ticker__in=view_ticker_list)
 
-        sentiment_list, data = get_request(tickers, News, news_aggregator, view_ticker_list)
+        sentiment_list = get_request(tickers, News, news_aggregator, view_ticker_list)
 
         form = TickerSelectForm()
         tickers_choice = Ticker.objects.all().order_by('ticker')
@@ -56,7 +58,7 @@ def main_view(request):
                                          widget=forms.Select(attrs={"class": "form_select"}))
         form.fields['ticker'] = choice_field
 
-        return render(request, 'stock/main.html', {'text': data, 'tickers': tickers, 'form': form,
+        return render(request, 'stock/main.html', {'form': form,
                                                    'sentiment': sentiment_list, 'user': request.user})
 
     else:
@@ -69,7 +71,7 @@ def main_view(request):
             request.user.profile.save()
 
             ticker_db = Ticker.objects.filter(ticker=ticker)
-            sentiment_list, _ = get_request(ticker_db, News, news_aggregator, [ticker])
+            sentiment_list = get_request(ticker_db, News, news_aggregator, [ticker])
             return JsonResponse({'status': 1, 'ticker': ticker,
                                  'positive': sentiment_list[0].get(ticker).get('positive'),
                                  'negative': sentiment_list[0].get(ticker).get('negative')})
@@ -90,8 +92,6 @@ def ajax_delete_ticker(request):
         if len(view_ticker_list) == 1:
             return JsonResponse({'status': 1})
 
-        print(ticker)
-        print(view_ticker_list)
         view_ticker_list.remove(ticker)
         request.user.profile.watch_list = ', '.join(view_ticker_list)
         request.user.profile.save()
@@ -113,7 +113,7 @@ def ajax_update_data(request):
             view_ticker_list = view_ticker.split(', ')
 
         tickers = Ticker.objects.filter(ticker__in=view_ticker_list)
-        sentiment_list, _ = get_request(tickers, News, news_aggregator, view_ticker_list)
+        sentiment_list = get_request(tickers, News, news_aggregator, view_ticker_list)
         sentiment_dict = {'data': sentiment_list}
 
         return JsonResponse(sentiment_dict)

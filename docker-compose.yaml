@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      dockerfile: ./Dockerfile
+    command:
+      - gunicorn
+      - stock_analysis.wsgi:application
+      - --bind
+      - "0.0.0.0:8000"
+    expose:
+      - 8000
+    restart: always
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "10"
+        max-size: "200k"
+    depends_on:
+      - pgdb
+
+  pgdb:
+    image: postgres
+    container_name: pgdb
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - pgdb:/var/lib/postgresql/data/
+
+  nginx:
+    build: ./nginx
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+    restart: always
+    ports:
+      - 80:80
+    depends_on:
+      - app
+
+volumes:
+  pgdb:
+  static_volume:
+  media_volume:
