@@ -27,6 +27,6 @@ for i in range(3):
 
 print('\nUnzipping files...')
 with ZipFile("modelfile1.zip", "r") as myzip:
-    myzip.extractall(path="stock_analysis")
+    myzip.extractall(path="stock_analysis/stock")
 with ZipFile("modelfile2.zip", "r") as myzip:
-    myzip.extractall(path="stock_analysis")
+    myzip.extractall(path="stock_analysis/stock")
