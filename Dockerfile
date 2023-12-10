@@ -8,7 +8,7 @@ WORKDIR /app
 RUN mkdir /app/static
 RUN mkdir /app/media
 
-RUN apt-get update
+RUN apt-get update && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt
 
